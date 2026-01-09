@@ -107,7 +107,7 @@ export function Sidebar({ className }) {
 
       <div className="p-4 border-t border-border">
         <p className="text-xs text-muted-foreground text-center">
-          Built for Patch.io
+          Demo
         </p>
       </div>
     </aside>
