@@ -51,6 +51,7 @@ export default function Dashboard() {
         icpScore: data.icpScore,
         sustainabilitySignals: data.sustainabilitySignals,
         stakeholders: data.stakeholders,
+        stakeholderSource: data.stakeholderSource,
         talkingPoints: data.talkingPoints,
       });
 
@@ -96,6 +97,7 @@ export default function Dashboard() {
         icpScore: data.icpScore,
         sustainabilitySignals: data.sustainabilitySignals,
         stakeholders: data.stakeholders,
+        stakeholderSource: data.stakeholderSource,
         talkingPoints: data.talkingPoints,
       });
 
@@ -224,7 +226,7 @@ export default function Dashboard() {
               <SustainabilitySignalsCard signals={briefData.sustainabilitySignals} />
 
               {/* Stakeholders - Now with real data! */}
-              <StakeholdersCard stakeholders={briefData.stakeholders} />
+              <StakeholdersCard stakeholders={briefData.stakeholders} source={briefData.stakeholderSource} />
 
               {/* Talking Points */}
               <TalkingPointsCard talkingPoints={briefData.talkingPoints} />

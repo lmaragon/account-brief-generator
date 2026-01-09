@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { searchPeopleByDomain } from "@/lib/apollo";
 
 const TAVILY_API_URL = "https://api.tavily.com/search";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -28,7 +29,7 @@ async function searchTavily(query, options = {}) {
   return response.json();
 }
 
-async function generateBriefWithOpenAI(domain, searchData, companyName) {
+async function generateBriefWithOpenAI(domain, searchData, companyName, hasApolloStakeholders) {
   // Prepare context from all search results
   const formatResults = (results, label) => {
     if (!results || results.length === 0) return `${label}: No results found`;
@@ -45,8 +46,18 @@ async function generateBriefWithOpenAI(domain, searchData, companyName) {
     formatResults(searchData.sustainability, "SUSTAINABILITY & ESG DATA"),
     formatResults(searchData.news, "RECENT NEWS"),
     formatResults(searchData.companyInfo, "COMPANY INFORMATION"),
-    formatResults(searchData.leadership, "LEADERSHIP & KEY PEOPLE"),
   ].join("\n\n---\n\n");
+
+  // Adjust prompt based on whether we have Apollo stakeholders
+  const stakeholderInstruction = hasApolloStakeholders
+    ? `"stakeholders": [] // Leave empty - we have verified stakeholder data from Apollo`
+    : `"stakeholders": [
+    {
+      "name": "<full name>",
+      "title": "<job title>",
+      "linkedinUrl": "<LinkedIn URL if found, otherwise construct: https://linkedin.com/in/firstname-lastname>"
+    }
+  ] // Find 3-5 key people: CSO, VP Sustainability, CFO, VP Procurement`;
 
   const prompt = `You are an expert GTM analyst specializing in sustainability solutions for Patch.io, a carbon credit marketplace platform.
 
@@ -75,13 +86,7 @@ Generate a JSON response with the following structure (valid JSON only, no markd
     "<signal 4>",
     "<signal 5>"
   ],
-  "stakeholders": [
-    {
-      "name": "<full name>",
-      "title": "<job title>",
-      "linkedinUrl": "<LinkedIn URL if found, otherwise best guess format: https://linkedin.com/in/firstname-lastname>"
-    }
-  ],
+  ${stakeholderInstruction},
   "talkingPoints": [
     "<point 1 - reference their specific commitments and explain Patch.io relevance>",
     "<point 2 - mention any sustainability roles or recent hires>",
@@ -94,20 +99,13 @@ IMPORTANT GUIDELINES:
 
 1. COMPANY INFO: Extract real data from search results. If not found, make reasonable inferences based on context clues.
 
-2. STAKEHOLDERS: Find 3-5 key people to contact. Prioritize:
-   - Chief Sustainability Officer, VP Sustainability, Head of ESG
-   - Chief Financial Officer, VP Finance (budget holders)
-   - VP Procurement, Supply Chain leaders
-   - CEO (for smaller companies)
-   Include LinkedIn URLs if found in search results, otherwise construct likely URL.
-
-3. ICP SCORING:
+2. ICP SCORING:
    - 80-100: Strong fit (public sustainability goals, enterprise scale, climate-first identity, active ESG)
    - 60-79: Medium fit (some sustainability initiatives, mid-market, passive ESG engagement)
    - 40-59: Weak fit (limited public ESG, smaller scale, unclear commitment)
    - 0-39: Poor fit (no visible sustainability focus)
 
-4. TALKING POINTS: Make them specific and actionable, referencing actual findings from the search results.`;
+3. TALKING POINTS: Make them specific and actionable, referencing actual findings from the search results.`;
 
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
@@ -188,37 +186,35 @@ export async function POST(request) {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-    // Run all Tavily searches in parallel
+    // Run Tavily searches and Apollo search in parallel
     const [
       sustainabilityResults,
       newsResults,
       companyInfoResults,
-      leadershipResults,
+      apolloStakeholders,
     ] = await Promise.all([
-      // Sustainability & ESG data
+      // Sustainability & ESG data from Tavily
       searchTavily(`site:${cleanDomain} sustainability ESG carbon climate net-zero`),
-      // Recent news
+      // Recent news from Tavily
       searchTavily(`"${companyName}" sustainability ESG carbon news 2024 2025`),
-      // Company information (LinkedIn, Crunchbase, about page)
+      // Company information from Tavily
       searchTavily(`"${companyName}" company overview employees headquarters founded industry`),
-      // Leadership and key stakeholders
-      searchTavily(`"${companyName}" sustainability officer CSO CFO "chief sustainability" OR "VP sustainability" OR "head of ESG" LinkedIn`),
+      // Stakeholders from Apollo (verified data)
+      searchPeopleByDomain(cleanDomain),
     ]);
 
-    // Organize search data
+    // Organize search data for OpenAI
     const searchData = {
       sustainability: sustainabilityResults.results || [],
       news: newsResults.results || [],
       companyInfo: companyInfoResults.results || [],
-      leadership: leadershipResults.results || [],
     };
 
-    // Combine all results for reference
+    // Combine all Tavily results for reference
     const allResults = [
       ...searchData.sustainability,
       ...searchData.news,
       ...searchData.companyInfo,
-      ...searchData.leadership,
     ];
 
     const seenUrls = new Set();
@@ -228,12 +224,21 @@ export async function POST(request) {
       return true;
     });
 
-    // Generate comprehensive brief with OpenAI
+    // Check if we have Apollo stakeholders
+    const hasApolloStakeholders = apolloStakeholders && apolloStakeholders.length > 0;
+
+    // Generate brief with OpenAI (company info, ICP score, signals, talking points)
     const briefContent = await generateBriefWithOpenAI(
       cleanDomain,
       searchData,
-      companyName
+      companyName,
+      hasApolloStakeholders
     );
+
+    // Use Apollo stakeholders if available, otherwise fall back to OpenAI-generated ones
+    const finalStakeholders = hasApolloStakeholders
+      ? apolloStakeholders
+      : briefContent.stakeholders || [];
 
     return NextResponse.json({
       domain: cleanDomain,
@@ -241,7 +246,8 @@ export async function POST(request) {
       company: briefContent.company,
       icpScore: briefContent.icpScore,
       sustainabilitySignals: briefContent.sustainabilitySignals,
-      stakeholders: briefContent.stakeholders,
+      stakeholders: finalStakeholders,
+      stakeholderSource: hasApolloStakeholders ? "apollo" : "openai",
       talkingPoints: briefContent.talkingPoints,
       searchResults: uniqueResults.slice(0, 6),
       totalSearchResults: uniqueResults.length,
