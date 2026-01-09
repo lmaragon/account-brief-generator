@@ -32,8 +32,8 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      // Call the Tavily search API
-      const response = await fetch("/api/search-sustainability", {
+      // Call the generate-brief API (includes Tavily + OpenAI)
+      const response = await fetch("/api/generate-brief", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -44,24 +44,36 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to search");
+        throw new Error(data.error || "Failed to generate brief");
       }
 
-      // Store Tavily results
-      setTavilyData(data);
-
-      // Use mock data for other sections (will be replaced in Phase 3/4)
+      // Store AI-generated brief data
       setBriefData({
-        ...mockBriefData,
         company: {
-          ...mockBriefData.company,
           name: data.companyName,
           domain: data.domain,
+          industry: "See sustainability signals below",
+          size: "Enterprise",
+          headquarters: "See search results",
+          funding: "See sustainability signals",
+          description: "AI-analyzed company",
         },
+        icpScore: data.icpScore,
+        sustainabilitySignals: data.sustainabilitySignals,
+        talkingPoints: data.talkingPoints,
+        stakeholders: mockBriefData.stakeholders, // Still using mock for Phase 4
+      });
+
+      // Store search results for reference
+      setTavilyData({
+        companyName: data.companyName,
+        domain: data.domain,
+        results: data.searchResults,
+        totalResults: data.totalSearchResults,
       });
     } catch (err) {
       setError(err.message);
-      console.error("Search error:", err);
+      console.error("Generate brief error:", err);
     } finally {
       setIsLoading(false);
     }
@@ -69,14 +81,13 @@ export default function Dashboard() {
 
   const handleDemoClick = async () => {
     setDomain("patagonia.com");
-    // Trigger form submission
     setIsLoading(true);
     setBriefData(null);
     setTavilyData(null);
     setError(null);
 
     try {
-      const response = await fetch("/api/search-sustainability", {
+      const response = await fetch("/api/generate-brief", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -87,14 +98,34 @@ export default function Dashboard() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.error || "Failed to search");
+        throw new Error(data.error || "Failed to generate brief");
       }
 
-      setTavilyData(data);
-      setBriefData(mockBriefData);
+      setBriefData({
+        company: {
+          name: data.companyName,
+          domain: data.domain,
+          industry: "See sustainability signals below",
+          size: "Enterprise",
+          headquarters: "See search results",
+          funding: "See sustainability signals",
+          description: "AI-analyzed company",
+        },
+        icpScore: data.icpScore,
+        sustainabilitySignals: data.sustainabilitySignals,
+        talkingPoints: data.talkingPoints,
+        stakeholders: mockBriefData.stakeholders,
+      });
+
+      setTavilyData({
+        companyName: data.companyName,
+        domain: data.domain,
+        results: data.searchResults,
+        totalResults: data.totalSearchResults,
+      });
     } catch (err) {
       setError(err.message);
-      console.error("Search error:", err);
+      console.error("Generate brief error:", err);
     } finally {
       setIsLoading(false);
     }
