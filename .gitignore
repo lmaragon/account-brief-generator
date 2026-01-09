@@ -16,6 +16,8 @@
 # Misc
 .DS_Store
 *.pem
+TODO.md
+CLAUDE.md
 
 # Debug
 npm-debug.log*

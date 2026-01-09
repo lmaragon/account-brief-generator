@@ -261,4 +261,97 @@ Sustainability Account Brief Generator
   - ICP scoring customization
   - Zapier integration for triggers
   - Gong call context integration
-  ---
+
+---
+## Implementation Plan (Piecemeal Build)
+
+We build in phases, each deployable and testable independently.
+
+### Phase 1: UI Foundation with Mock Data
+**Goal:** Build the complete dashboard UI using hardcoded data so we can see and iterate on the design.
+
+- [ ] Install shadcn/ui and required components (Card, Button, Input, Progress, Avatar, Skeleton)
+- [ ] Create the dashboard layout with sidebar
+- [ ] Build the domain input form (non-functional)
+- [ ] Create all result display components with mock Patagonia data:
+  - ICP Score card with progress bar
+  - Company Overview card
+  - Sustainability Signals card
+  - Key Stakeholders card
+  - Talking Points card
+- [ ] Add "Push to HubSpot" button (non-functional)
+- [ ] Add loading skeleton states
+
+**Test:** Visual inspection at localhost:3000 and deployed Vercel URL
+
+---
+
+### Phase 2: Tavily Integration (Sustainability Search)
+**Goal:** First real API - fetch sustainability signals for any domain.
+
+- [ ] Create `/api/search-sustainability` endpoint
+- [ ] Integrate Tavily API with two queries:
+  - `site:{domain} sustainability ESG carbon`
+  - `{company name} sustainability news 2024 2025`
+- [ ] Add TAVILY_API_KEY to .env.local and Vercel
+- [ ] Connect frontend form to call this endpoint
+- [ ] Display raw Tavily results in the Sustainability Signals card
+
+**Test:** Enter "patagonia.com" → see real sustainability data appear
+
+---
+
+### Phase 3: OpenAI Integration (Brief Generation)
+**Goal:** Transform raw data into a structured, useful brief.
+
+- [ ] Create `/api/generate-brief` endpoint (partial - just Tavily + OpenAI)
+- [ ] Design the OpenAI prompt for brief generation
+- [ ] Add OPENAI_API_KEY to .env.local and Vercel
+- [ ] Return structured JSON: summary, ICP score, sustainability signals, talking points
+- [ ] Update frontend to display AI-generated content in all cards
+- [ ] Add proper loading states during generation
+
+**Test:** Enter domain → see AI-generated brief with ICP score and talking points
+
+---
+
+### Phase 4: Clay Integration (Company & People Data)
+**Goal:** Add firmographics and stakeholder data for complete briefs.
+
+- [ ] Add Clay API client for company enrichment
+- [ ] Add Clay API client for people search (by title filters)
+- [ ] Add CLAY_API_KEY to .env.local and Vercel
+- [ ] Update `/api/generate-brief` to orchestrate: Clay → Tavily → OpenAI
+- [ ] Pass all enriched data to OpenAI for better brief generation
+- [ ] Display Company Overview with real firmographics
+- [ ] Display Key Stakeholders with LinkedIn URLs
+
+**Test:** Enter domain → see complete brief with company data + stakeholders + sustainability + talking points
+
+---
+
+### Phase 5: HubSpot Integration (CRM Push)
+**Goal:** One-click push to HubSpot CRM.
+
+- [ ] Create HubSpot private app and get access token
+- [ ] Create `/api/push-hubspot` endpoint
+- [ ] Implement company create/update (by domain lookup)
+- [ ] Implement contact creation for stakeholders
+- [ ] Implement note attachment with brief content
+- [ ] Add HUBSPOT_ACCESS_TOKEN to .env.local and Vercel
+- [ ] Connect "Push to HubSpot" button to endpoint
+- [ ] Show success state with link to HubSpot company record
+
+**Test:** Generate brief → click Push to HubSpot → verify data appears in HubSpot CRM
+
+---
+
+### Current Status
+- [x] Phase 0: Hello world app deployed to Vercel
+- [ ] Phase 1: UI Foundation (IN PROGRESS)
+- [ ] Phase 2: Tavily Integration
+- [ ] Phase 3: OpenAI Integration
+- [ ] Phase 4: Clay Integration
+- [ ] Phase 5: HubSpot Integration
+
+---
