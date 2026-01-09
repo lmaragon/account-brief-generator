@@ -59,9 +59,13 @@ async function generateBriefWithOpenAI(domain, searchData, companyName, hasApoll
     }
   ] // Find 3-5 key people: CSO, VP Sustainability, CFO, VP Procurement`;
 
-  const prompt = `You are an expert GTM analyst specializing in sustainability solutions for Patch.io, a carbon credit marketplace platform.
+  const prompt = `You are an expert GTM analyst for Patch.io, a carbon credit marketplace and climate API platform that helps companies:
+- Purchase verified carbon credits from high-quality removal and avoidance projects
+- Integrate carbon offsetting into products/checkout flows via API
+- Track and report on carbon credit portfolios for ESG compliance
+- Meet net-zero commitments with transparent, verified offsets
 
-Analyze the following research for ${companyName} (${domain}) and generate a comprehensive account brief.
+Analyze the following research for ${companyName} (${domain}) and generate a sales-ready account brief.
 
 ${searchContext}
 
@@ -77,35 +81,48 @@ Generate a JSON response with the following structure (valid JSON only, no markd
   },
   "icpScore": {
     "score": <number 0-100>,
-    "reasoning": "<1-2 sentence explanation of why this score>"
+    "reasoning": "<1-2 sentence explanation focusing on their carbon credit/offset needs>"
   },
   "sustainabilitySignals": [
-    "<signal 1 - specific commitment or achievement>",
-    "<signal 2>",
-    "<signal 3>",
-    "<signal 4>",
-    "<signal 5>"
+    "<signal 1 - net-zero or carbon neutrality commitments with target year>",
+    "<signal 2 - climate pledges: Science Based Targets (SBTi), Climate Pledge, Race to Zero, RE100>",
+    "<signal 3 - ESG reporting: CDP disclosure, TCFD alignment, sustainability reports>",
+    "<signal 4 - carbon offset/credit purchases or renewable energy investments>",
+    "<signal 5 - sustainability leadership hires or dedicated teams>"
   ],
   ${stakeholderInstruction},
   "talkingPoints": [
-    "<point 1 - reference their specific commitments and explain Patch.io relevance>",
-    "<point 2 - mention any sustainability roles or recent hires>",
-    "<point 3 - reference their ESG/climate pledges or memberships>",
-    "<point 4 - tie to regulatory or reporting requirements>"
+    "<point 1 - specific carbon offset opportunity based on their net-zero timeline>",
+    "<point 2 - how Patch.io helps with their specific climate pledge commitments>",
+    "<point 3 - ESG reporting angle: CSRD, SEC climate rules, CDP scoring improvement>",
+    "<point 4 - competitive/industry angle: how peers are using carbon credits>"
   ]
 }
 
 IMPORTANT GUIDELINES:
 
-1. COMPANY INFO: Extract real data from search results. If not found, make reasonable inferences based on context clues.
+1. COMPANY INFO: Extract real data from search results. If not found, make reasonable inferences.
 
-2. ICP SCORING:
-   - 80-100: Strong fit (public sustainability goals, enterprise scale, climate-first identity, active ESG)
-   - 60-79: Medium fit (some sustainability initiatives, mid-market, passive ESG engagement)
-   - 40-59: Weak fit (limited public ESG, smaller scale, unclear commitment)
-   - 0-39: Poor fit (no visible sustainability focus)
+2. ICP SCORING (Ideal Customer Profile for carbon credit purchases):
+   - 90-100: Perfect fit - Public net-zero commitment, SBTi validated, enterprise scale, actively purchasing offsets
+   - 75-89: Strong fit - Climate pledges (Climate Pledge, Race to Zero), ESG reporting, likely need carbon credits
+   - 60-74: Good fit - Sustainability initiatives, mid-market+, would benefit from carbon offsetting
+   - 40-59: Moderate fit - Some ESG activity, unclear carbon strategy, needs education
+   - 0-39: Weak fit - No visible climate commitments or too small scale
 
-3. TALKING POINTS: Make them specific and actionable, referencing actual findings from the search results.`;
+3. SUSTAINABILITY SIGNALS: Prioritize signals that indicate carbon credit buying intent:
+   - Net-zero or carbon neutral commitments (with dates)
+   - Climate coalition memberships (SBTi, Climate Pledge, Race to Zero, RE100)
+   - Scope 1/2/3 emissions tracking or disclosure
+   - Previous carbon offset purchases
+   - CDP participation or sustainability reporting
+
+4. TALKING POINTS: Make them Patch.io-specific and actionable:
+   - Reference their exact net-zero year and how Patch helps bridge the gap
+   - Mention specific climate pledges and Patch's verified credit portfolio
+   - Tie to upcoming regulations (CSRD in EU, SEC climate disclosure, California rules)
+   - Reference how competitors or industry leaders are using carbon credits
+   - If they have an API/platform, mention Patch's API for embedded carbon offsetting`;
 
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
@@ -193,10 +210,10 @@ export async function POST(request) {
       companyInfoResults,
       apolloStakeholders,
     ] = await Promise.all([
-      // Sustainability & ESG data from Tavily
-      searchTavily(`site:${cleanDomain} sustainability ESG carbon climate net-zero`),
-      // Recent news from Tavily
-      searchTavily(`"${companyName}" sustainability ESG carbon news 2024 2025`),
+      // Carbon & climate commitments from company site
+      searchTavily(`site:${cleanDomain} carbon neutral net-zero emissions climate commitment 2030 2040 2050`),
+      // Climate pledges and ESG news
+      searchTavily(`"${companyName}" "Science Based Targets" OR "Climate Pledge" OR "carbon offset" OR "net-zero" OR "CDP" 2024 2025`),
       // Company information from Tavily
       searchTavily(`"${companyName}" company overview employees headquarters founded industry`),
       // Stakeholders from Apollo (verified data)
