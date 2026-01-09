@@ -12,13 +12,15 @@ import {
   TalkingPointsCard,
   BriefSkeleton,
 } from "@/components/brief";
+import { TavilyResultsCard } from "@/components/brief/tavily-results-card";
 import { mockBriefData } from "@/lib/mock-data";
 
 export default function Dashboard() {
   const [domain, setDomain] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [briefData, setBriefData] = useState(null);
-  const [showDemo, setShowDemo] = useState(false);
+  const [tavilyData, setTavilyData] = useState(null);
+  const [error, setError] = useState(null);
 
   const handleGenerate = async (e) => {
     e.preventDefault();
@@ -26,30 +28,79 @@ export default function Dashboard() {
 
     setIsLoading(true);
     setBriefData(null);
+    setTavilyData(null);
+    setError(null);
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Call the Tavily search API
+      const response = await fetch("/api/search-sustainability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ domain: domain.trim() }),
+      });
 
-    // For now, just show mock data
-    setBriefData(mockBriefData);
-    setIsLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to search");
+      }
+
+      // Store Tavily results
+      setTavilyData(data);
+
+      // Use mock data for other sections (will be replaced in Phase 3/4)
+      setBriefData({
+        ...mockBriefData,
+        company: {
+          ...mockBriefData.company,
+          name: data.companyName,
+          domain: data.domain,
+        },
+      });
+    } catch (err) {
+      setError(err.message);
+      console.error("Search error:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleDemoClick = async () => {
     setDomain("patagonia.com");
+    // Trigger form submission
     setIsLoading(true);
     setBriefData(null);
-    setShowDemo(true);
+    setTavilyData(null);
+    setError(null);
 
-    // Simulate API call delay
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const response = await fetch("/api/search-sustainability", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ domain: "patagonia.com" }),
+      });
 
-    setBriefData(mockBriefData);
-    setIsLoading(false);
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to search");
+      }
+
+      setTavilyData(data);
+      setBriefData(mockBriefData);
+    } catch (err) {
+      setError(err.message);
+      console.error("Search error:", err);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handlePushToHubSpot = () => {
-    // Placeholder for HubSpot integration
     alert("HubSpot integration coming in Phase 5!");
   };
 
@@ -103,7 +154,7 @@ export default function Dashboard() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Generating...
+                    Searching...
                   </>
                 ) : (
                   "Generate Brief"
@@ -112,8 +163,15 @@ export default function Dashboard() {
             </div>
           </form>
 
+          {/* Error Message */}
+          {error && (
+            <div className="mb-8 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+              <p className="text-sm text-destructive">{error}</p>
+            </div>
+          )}
+
           {/* Demo Button - show only when no data */}
-          {!briefData && !isLoading && (
+          {!briefData && !isLoading && !error && (
             <div className="mb-8 p-4 bg-muted/50 rounded-lg border border-dashed">
               <p className="text-sm text-muted-foreground mb-3">
                 Want to see a demo? Click below to generate a sample brief for
@@ -140,7 +198,16 @@ export default function Dashboard() {
                 <CompanyOverviewCard company={briefData.company} />
               </div>
 
-              {/* Sustainability Signals */}
+              {/* Tavily Search Results - Real Data */}
+              {tavilyData && (
+                <TavilyResultsCard
+                  results={tavilyData.results}
+                  siteAnswer={tavilyData.siteSearchAnswer}
+                  newsAnswer={tavilyData.newsSearchAnswer}
+                />
+              )}
+
+              {/* Sustainability Signals - Mock data placeholder */}
               <SustainabilitySignalsCard signals={briefData.sustainabilitySignals} />
 
               {/* Stakeholders */}

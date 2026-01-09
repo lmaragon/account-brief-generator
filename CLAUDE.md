@@ -289,13 +289,13 @@ We build in phases, each deployable and testable independently.
 ### Phase 2: Tavily Integration (Sustainability Search)
 **Goal:** First real API - fetch sustainability signals for any domain.
 
-- [ ] Create `/api/search-sustainability` endpoint
-- [ ] Integrate Tavily API with two queries:
+- [x] Create `/api/search-sustainability` endpoint
+- [x] Integrate Tavily API with two queries:
   - `site:{domain} sustainability ESG carbon`
   - `{company name} sustainability news 2024 2025`
-- [ ] Add TAVILY_API_KEY to .env.local and Vercel
-- [ ] Connect frontend form to call this endpoint
-- [ ] Display raw Tavily results in the Sustainability Signals card
+- [x] Add TAVILY_API_KEY to .env.local and Vercel
+- [x] Connect frontend form to call this endpoint
+- [x] Display Tavily results in new TavilyResultsCard component
 
 **Test:** Enter "patagonia.com" → see real sustainability data appear
 
@@ -349,7 +349,7 @@ We build in phases, each deployable and testable independently.
 ### Current Status
 - [x] Phase 0: Hello world app deployed to Vercel
 - [x] Phase 1: UI Foundation (COMPLETE)
-- [ ] Phase 2: Tavily Integration
+- [x] Phase 2: Tavily Integration (COMPLETE)
 - [ ] Phase 3: OpenAI Integration
 - [ ] Phase 4: Clay Integration
 - [ ] Phase 5: HubSpot Integration
