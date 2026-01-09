@@ -13,7 +13,6 @@ import {
   BriefSkeleton,
 } from "@/components/brief";
 import { TavilyResultsCard } from "@/components/brief/tavily-results-card";
-import { mockBriefData } from "@/lib/mock-data";
 
 export default function Dashboard() {
   const [domain, setDomain] = useState("");
@@ -32,7 +31,6 @@ export default function Dashboard() {
     setError(null);
 
     try {
-      // Call the generate-brief API (includes Tavily + OpenAI)
       const response = await fetch("/api/generate-brief", {
         method: "POST",
         headers: {
@@ -47,21 +45,13 @@ export default function Dashboard() {
         throw new Error(data.error || "Failed to generate brief");
       }
 
-      // Store AI-generated brief data
+      // Store AI-generated brief data (all real data now!)
       setBriefData({
-        company: {
-          name: data.companyName,
-          domain: data.domain,
-          industry: "See sustainability signals below",
-          size: "Enterprise",
-          headquarters: "See search results",
-          funding: "See sustainability signals",
-          description: "AI-analyzed company",
-        },
+        company: data.company,
         icpScore: data.icpScore,
         sustainabilitySignals: data.sustainabilitySignals,
+        stakeholders: data.stakeholders,
         talkingPoints: data.talkingPoints,
-        stakeholders: mockBriefData.stakeholders, // Still using mock for Phase 4
       });
 
       // Store search results for reference
@@ -102,19 +92,11 @@ export default function Dashboard() {
       }
 
       setBriefData({
-        company: {
-          name: data.companyName,
-          domain: data.domain,
-          industry: "See sustainability signals below",
-          size: "Enterprise",
-          headquarters: "See search results",
-          funding: "See sustainability signals",
-          description: "AI-analyzed company",
-        },
+        company: data.company,
         icpScore: data.icpScore,
         sustainabilitySignals: data.sustainabilitySignals,
+        stakeholders: data.stakeholders,
         talkingPoints: data.talkingPoints,
-        stakeholders: mockBriefData.stakeholders,
       });
 
       setTavilyData({
@@ -185,7 +167,7 @@ export default function Dashboard() {
                         d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
                       />
                     </svg>
-                    Searching...
+                    Generating...
                   </>
                 ) : (
                   "Generate Brief"
@@ -229,7 +211,7 @@ export default function Dashboard() {
                 <CompanyOverviewCard company={briefData.company} />
               </div>
 
-              {/* Tavily Search Results - Real Data */}
+              {/* Tavily Search Results */}
               {tavilyData && (
                 <TavilyResultsCard
                   results={tavilyData.results}
@@ -238,10 +220,10 @@ export default function Dashboard() {
                 />
               )}
 
-              {/* Sustainability Signals - Mock data placeholder */}
+              {/* Sustainability Signals */}
               <SustainabilitySignalsCard signals={briefData.sustainabilitySignals} />
 
-              {/* Stakeholders */}
+              {/* Stakeholders - Now with real data! */}
               <StakeholdersCard stakeholders={briefData.stakeholders} />
 
               {/* Talking Points */}

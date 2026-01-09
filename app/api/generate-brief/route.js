@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 const TAVILY_API_URL = "https://api.tavily.com/search";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 
-async function searchTavily(query) {
+async function searchTavily(query, options = {}) {
   const response = await fetch(TAVILY_API_URL, {
     method: "POST",
     headers: {
@@ -16,6 +16,7 @@ async function searchTavily(query) {
       include_answer: true,
       include_raw_content: false,
       max_results: 5,
+      ...options,
     }),
   });
 
@@ -27,35 +28,59 @@ async function searchTavily(query) {
   return response.json();
 }
 
-async function generateBriefWithOpenAI(domain, tavilyResults, companyName) {
-  // Prepare context from Tavily results
-  const resultsContext = tavilyResults
-    .slice(0, 10)
-    .map(
-      (result, idx) =>
-        `${idx + 1}. "${result.title}"\n   ${result.content}\n   Source: ${result.url}`
-    )
-    .join("\n\n");
+async function generateBriefWithOpenAI(domain, searchData, companyName) {
+  // Prepare context from all search results
+  const formatResults = (results, label) => {
+    if (!results || results.length === 0) return `${label}: No results found`;
+    return `${label}:\n${results
+      .slice(0, 5)
+      .map(
+        (result, idx) =>
+          `  ${idx + 1}. "${result.title}"\n     ${result.content}\n     URL: ${result.url}`
+      )
+      .join("\n\n")}`;
+  };
+
+  const searchContext = [
+    formatResults(searchData.sustainability, "SUSTAINABILITY & ESG DATA"),
+    formatResults(searchData.news, "RECENT NEWS"),
+    formatResults(searchData.companyInfo, "COMPANY INFORMATION"),
+    formatResults(searchData.leadership, "LEADERSHIP & KEY PEOPLE"),
+  ].join("\n\n---\n\n");
 
   const prompt = `You are an expert GTM analyst specializing in sustainability solutions for Patch.io, a carbon credit marketplace platform.
 
-Analyze the following sustainability research for ${companyName} (${domain}) and generate a structured account brief.
+Analyze the following research for ${companyName} (${domain}) and generate a comprehensive account brief.
 
-SEARCH RESULTS:
-${resultsContext}
+${searchContext}
 
-Generate a JSON response with the following structure (valid JSON only, no markdown):
+Generate a JSON response with the following structure (valid JSON only, no markdown code blocks):
 {
+  "company": {
+    "name": "<official company name>",
+    "industry": "<primary industry>",
+    "size": "<employee count range, e.g., '1,000 - 5,000 employees'>",
+    "headquarters": "<city, state/country>",
+    "funding": "<funding status: Public, Private, or latest funding round>",
+    "description": "<1-2 sentence company description>"
+  },
   "icpScore": {
     "score": <number 0-100>,
     "reasoning": "<1-2 sentence explanation of why this score>"
   },
   "sustainabilitySignals": [
-    "<signal 1>",
+    "<signal 1 - specific commitment or achievement>",
     "<signal 2>",
     "<signal 3>",
     "<signal 4>",
     "<signal 5>"
+  ],
+  "stakeholders": [
+    {
+      "name": "<full name>",
+      "title": "<job title>",
+      "linkedinUrl": "<LinkedIn URL if found, otherwise best guess format: https://linkedin.com/in/firstname-lastname>"
+    }
   ],
   "talkingPoints": [
     "<point 1 - reference their specific commitments and explain Patch.io relevance>",
@@ -65,18 +90,24 @@ Generate a JSON response with the following structure (valid JSON only, no markd
   ]
 }
 
-SCORING GUIDELINES:
-- 80-100: Strong fit (public sustainability goals, enterprise scale, climate-first identity, active ESG)
-- 60-79: Medium fit (some sustainability initiatives, mid-market, passive ESG engagement)
-- 40-59: Weak fit (limited public ESG, smaller scale, unclear commitment)
-- 0-39: Poor fit (no visible sustainability focus)
+IMPORTANT GUIDELINES:
 
-CONTEXT: We're selling carbon credit marketplace solutions to enterprises. Look for:
-- Net-zero commitments and carbon accounting needs
-- ESG reporting requirements
-- Sustainability teams/officers
-- Recent ESG investments or announcements
-- Climate pledges (Science-based, Climate Pledge, etc.)`;
+1. COMPANY INFO: Extract real data from search results. If not found, make reasonable inferences based on context clues.
+
+2. STAKEHOLDERS: Find 3-5 key people to contact. Prioritize:
+   - Chief Sustainability Officer, VP Sustainability, Head of ESG
+   - Chief Financial Officer, VP Finance (budget holders)
+   - VP Procurement, Supply Chain leaders
+   - CEO (for smaller companies)
+   Include LinkedIn URLs if found in search results, otherwise construct likely URL.
+
+3. ICP SCORING:
+   - 80-100: Strong fit (public sustainability goals, enterprise scale, climate-first identity, active ESG)
+   - 60-79: Medium fit (some sustainability initiatives, mid-market, passive ESG engagement)
+   - 40-59: Weak fit (limited public ESG, smaller scale, unclear commitment)
+   - 0-39: Poor fit (no visible sustainability focus)
+
+4. TALKING POINTS: Make them specific and actionable, referencing actual findings from the search results.`;
 
   const response = await fetch(OPENAI_API_URL, {
     method: "POST",
@@ -93,7 +124,7 @@ CONTEXT: We're selling carbon credit marketplace solutions to enterprises. Look 
         },
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 1500,
     }),
   });
 
@@ -105,11 +136,17 @@ CONTEXT: We're selling carbon credit marketplace solutions to enterprises. Look 
   const data = await response.json();
   const content = data.choices[0].message.content;
 
-  // Parse the JSON response
+  // Parse the JSON response - handle potential markdown code blocks
   try {
-    return JSON.parse(content);
+    // Remove markdown code blocks if present
+    const cleanContent = content
+      .replace(/```json\n?/g, "")
+      .replace(/```\n?/g, "")
+      .trim();
+    return JSON.parse(cleanContent);
   } catch (e) {
-    throw new Error(`Failed to parse OpenAI response as JSON: ${content}`);
+    console.error("Failed to parse OpenAI response:", content);
+    throw new Error(`Failed to parse OpenAI response as JSON`);
   }
 }
 
@@ -151,16 +188,37 @@ export async function POST(request) {
       .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
       .join(" ");
 
-    // Run both Tavily searches in parallel
-    const [siteSearchResults, newsSearchResults] = await Promise.all([
-      searchTavily(`site:${cleanDomain} sustainability ESG carbon climate`),
+    // Run all Tavily searches in parallel
+    const [
+      sustainabilityResults,
+      newsResults,
+      companyInfoResults,
+      leadershipResults,
+    ] = await Promise.all([
+      // Sustainability & ESG data
+      searchTavily(`site:${cleanDomain} sustainability ESG carbon climate net-zero`),
+      // Recent news
       searchTavily(`"${companyName}" sustainability ESG carbon news 2024 2025`),
+      // Company information (LinkedIn, Crunchbase, about page)
+      searchTavily(`"${companyName}" company overview employees headquarters founded industry`),
+      // Leadership and key stakeholders
+      searchTavily(`"${companyName}" sustainability officer CSO CFO "chief sustainability" OR "VP sustainability" OR "head of ESG" LinkedIn`),
     ]);
 
-    // Combine and deduplicate results
+    // Organize search data
+    const searchData = {
+      sustainability: sustainabilityResults.results || [],
+      news: newsResults.results || [],
+      companyInfo: companyInfoResults.results || [],
+      leadership: leadershipResults.results || [],
+    };
+
+    // Combine all results for reference
     const allResults = [
-      ...(siteSearchResults.results || []),
-      ...(newsSearchResults.results || []),
+      ...searchData.sustainability,
+      ...searchData.news,
+      ...searchData.companyInfo,
+      ...searchData.leadership,
     ];
 
     const seenUrls = new Set();
@@ -170,20 +228,22 @@ export async function POST(request) {
       return true;
     });
 
-    // Generate brief with OpenAI
+    // Generate comprehensive brief with OpenAI
     const briefContent = await generateBriefWithOpenAI(
       cleanDomain,
-      uniqueResults,
+      searchData,
       companyName
     );
 
     return NextResponse.json({
       domain: cleanDomain,
-      companyName,
+      companyName: briefContent.company?.name || companyName,
+      company: briefContent.company,
       icpScore: briefContent.icpScore,
       sustainabilitySignals: briefContent.sustainabilitySignals,
+      stakeholders: briefContent.stakeholders,
       talkingPoints: briefContent.talkingPoints,
-      searchResults: uniqueResults.slice(0, 6), // Include top results for reference
+      searchResults: uniqueResults.slice(0, 6),
       totalSearchResults: uniqueResults.length,
     });
   } catch (error) {
